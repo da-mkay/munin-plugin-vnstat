@@ -4,7 +4,7 @@ Munin-plugins for vnstat
 
 > This plugin is an improved and simplified version of the vnstat_ plugin by wandrer and _KaszpiR_
 
-> Hint: For information about usage, configuration and the authors take a look at the comments inside the scripts.
+Hint: For information about usage, configuration and the authors take a look at the comments inside the scripts.
 
 Examples:
 ---------
