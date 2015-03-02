@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# NAME
+#  vnstat_day_ - Munin plugin to monitor the daily traffic of network interfaces
+#
+# DESCRIPTION
+#  This is a very simple munin plugin which can be used to monitor the daily
+#  traffic of several network interfaces using vnstat.
+#  If this plugin is run as root it will update the vnstat database before
+#  retrieving the traffic statistics.
+#
+#  NOTE: There is another version of this plugin available which monitors the
+#        monthly traffic (vnstat_month_).
+#
+# USAGE
+#  This is a wildcard plugin. To monitor the network interface "iface" you need
+#  to create a symlink "vnstat_day_iface" to this plugin.
+#
+#  Example - Setup monitoring for eth0 on Debian 7 Wheezy:
+#   $ cp vnstat_day_ /usr/share/munin/plugins/
+#   $ cd /etc/munin/plugins
+#   $ ln -s /usr/share/munin/plugins/vnstat_day_ vnstat_day_eth0
+#
+# CONFIGURATION
+#  This plugin has no configuration options. But you need to specify the
+#  interface that should be monitored by using a special symlink name. See
+#  section USAGE above for more information.
+#
+# AUTHOR
+#  da-mkay (https://github.com/da-mkay)
+#
+#  This plugin is an improved and simplified version of the vnstat_ plugin by
+#  wandrer and _KaszpiR_. See
+#  https://github.com/munin-monitoring/contrib/blob/master/plugins/network/vnstat_
+#
+# LICENSE
+#  GPL 2
+#
+# CHANGELOG
+#  2015.03.01 - da-mkay
+#   - Parse values as MebiBytes/KibiBytes instead of Megabytes/KiloBytes because
+#     vnstat outputs MiB/KiB. See `man vnstat`.
+#   - Added total traffic value (sum of received and sent data)
+#   - Take KiB into account, not just MiB
+#   - Simplified code; for example loops for calculations were removed
+#   - Split script into two versions: one for the daily traffic and one for the
+#     monthly traffic.
+#  2009.09.28 - KaszpiR
+#   - Added support for multiple interfaces
+#  ????.??.?? - wandrer
+#   - Initial plugin
+
+
+IFACE=${0##*vnstat_day_}
+
+# Config section
+if [ "$1" = "config" ]; then
+	echo "graph_title vnstat - $IFACE Daily Traffic"
+	echo 'graph_args --base 1024 --lower-limit 0'
+	echo 'graph_vlabel Daily Traffic'
+	echo 'graph_category network'
+	echo 'graph_info Daily network traffic in bytes.'
+	echo 'totaltx.label Sent'
+	echo 'totaltx.info Total data sent.'
+	echo 'totaltx.cdef totaltx,1024,*'
+	echo 'totalrx.label Received'
+	echo 'totalrx.info Total data received.'
+	echo 'totalrx.cdef totalrx,1024,*'
+	echo 'totaltt.label Total'
+	echo 'totaltt.info Total data sent and received.'
+	echo 'totaltt.cdef totaltt,1024,*'
+	exit 0
+fi;
+
+# Graph Data
+
+# Running as root? --> update database
+if [ `whoami` = "root" ]; then
+	`vnstat -u`
+fi;
+
+# Grab the total received/sent daily traffic from the database.
+CURDAYSTATS=`vnstat --dumpdb -i $IFACE | grep  '^d;0'`
+
+TOTALRXMIB=`echo $CURDAYSTATS | cut -d';' -f4`
+TOTALTXMIB=`echo $CURDAYSTATS | cut -d';' -f5`
+TOTALRXKIB=`echo $CURDAYSTATS | cut -d';' -f6`
+TOTALTXKIB=`echo $CURDAYSTATS | cut -d';' -f7`
+
+let 'TOTALRXKIB = TOTALRXKIB + (TOTALRXMIB*1024)'
+let 'TOTALTXKIB = TOTALTXKIB + (TOTALTXMIB*1024)'
+let 'TOTALTTKIB = TOTALRXKIB + TOTALTXKIB'
+
+echo 'totalrx.value' $TOTALRXKIB
+echo 'totaltx.value' $TOTALTXKIB
+echo 'totaltt.value' $TOTALTTKIB
+
+exit 0
